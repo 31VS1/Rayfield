@@ -239,35 +239,67 @@ local function UnpackColor(Color)
 	return Color3.fromRGB(Color.R, Color.G, Color.B)
 end
 
-local function LoadConfiguration(Configuration)
-	local Data = HttpService:JSONDecode(Configuration)
-	table.foreach(Data, function(FlagName, FlagValue)
-		if RayfieldLibrary.Flags[FlagName] then
-			spawn(function() 
-				if RayfieldLibrary.Flags[FlagName].Type == "ColorPicker" then
-					RayfieldLibrary.Flags[FlagName]:Set(UnpackColor(FlagValue))
-				else
-					if RayfieldLibrary.Flags[FlagName].CurrentValue or RayfieldLibrary.Flags[FlagName].CurrentKeybind or RayfieldLibrary.Flags[FlagName].CurrentOption or RayfieldLibrary.Flags[FlagName].Color ~= FlagValue then RayfieldLibrary.Flags[FlagName]:Set(FlagValue) end
-				end    
-			end)
-		else
-			RayfieldLibrary:Notify({Title = "Flag Error", Content = "Rayfield was unable to find '"..FlagName.. "'' in the current script"})
-		end
-	end)
+local function LoadConfiguration(configuration)
+    local data = HttpService:JSONDecode(configuration)
+    for flagName, flagValue in pairs(data) do
+        if RayfieldLibrary.Flags[flagName] then
+            spawn(function()
+                local flag = RayfieldLibrary.Flags[flagName]
+                if flag.Type == "ColorPicker" then
+                    flag:Set(UnpackColor(flagValue))
+                else
+                    local isValueChanged = flag.CurrentValue ~= flagValue
+                    local isKeybindChanged = flag.CurrentKeybind ~= flagValue
+                    local isOptionChanged = flag.CurrentOption ~= flagValue
+                    local isColorChanged = flag.Color ~= flagValue
+                    
+                    if isValueChanged or isKeybindChanged or isOptionChanged or isColorChanged then
+                        flag:Set(flagValue)
+                    end
+                end
+            end)
+        else
+            RayfieldLibrary:Notify({
+                Title = "Flag Error",
+                Content = "Rayfield was unable to find the flag '" .. flagName .. "' in the current script."
+            })
+        end
+    end
 end
 
+
 local function SaveConfiguration()
-	if not CEnabled then return end
-	local Data = {}
-	for i,v in pairs(RayfieldLibrary.Flags) do
-		if v.Type == "ColorPicker" then
-			Data[i] = PackColor(v.Color)
-		else
-			Data[i] = v.CurrentValue or v.CurrentKeybind or v.CurrentOption or v.Color
-		end
-	end	
-	writefile(ConfigurationFolder .. "/" .. CFileName .. ConfigurationExtension, tostring(HttpService:JSONEncode(Data)))
+    -- Exit the function if configuration saving is disabled
+    if not CEnabled then
+        return
+    end
+
+    local data = {}
+    -- Iterate through each flag in RayfieldLibrary
+    for key, flag in pairs(RayfieldLibrary.Flags) do
+        -- Check the flag type
+        if flag.Type == "ColorPicker" then
+            -- Store color information using PackColor function
+            data[key] = PackColor(flag.Color)
+        else
+            -- Store the appropriate value (CurrentValue, CurrentKeybind, CurrentOption, or Color)
+            data[key] = flag.CurrentValue or flag.CurrentKeybind or flag.CurrentOption or flag.Color
+        end
+    end
+
+    -- Encode the data to JSON format and save it to a file
+    local success, err = pcall(function()
+        local filePath = ConfigurationFolder .. "/" .. CFileName .. ConfigurationExtension
+        writefile(filePath, HttpService:JSONEncode(data))
+    end)
+
+    -- If there was an error saving the file, handle it
+    if not success then
+        print("Error saving configuration: " .. err)
+        -- You may want to handle the error in a specific way, such as notifying the user
+    end
 end
+
 
 local neon = (function() -- Open sourced neon module
 	local module = {}
